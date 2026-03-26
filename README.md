@@ -79,11 +79,3 @@ Si tienes ideas para mejorar los cálculos de raciones o añadir nuevas funcione
 
 **Buena Caza y Largas Lunas.** ⚜️  
 *Desarrollado para facilitar la vida a los equipos de intendencia.*
-```
-
----
-
-### 💡 Nota importante para tu repositorio:
-Para que GitHub muestre correctamente los iconos de la cabecera, asegúrate de que el nombre del archivo sea exactamente **`README.md`** (todo en mayúsculas menos la extensión).
-
-**¿Quieres que te prepare también una pequeña sección de "Licencia" por si quieres que otros grupos scouts del mundo puedan usar tu código legalmente?** Es el último toque para un repositorio profesional.
