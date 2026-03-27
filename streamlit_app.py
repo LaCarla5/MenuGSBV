@@ -60,22 +60,20 @@ def generar_pdf(df_final, total_pax, re_total, resumen_menu, censo_dict):
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     
-    # --- PÁGINA 1: PLANIFICACIÓN DE MENÚ ---
+    # --- PÁGINA 1: PLANIFICACIÓN ---
     pdf.add_page()
     pdf.set_font("Arial", "B", 16)
-    pdf.set_text_color(27, 69, 180) # Azul GSBV
+    pdf.set_text_color(27, 69, 180) 
     pdf.cell(w=200, h=10, txt="PLANIFICACION DE MENU - GSBV", border=0, ln=1, align="C")
     pdf.ln(10)
     
-    pdf.set_text_color(0, 0, 0) # Volver a negro para el contenido
+    pdf.set_text_color(0, 0, 0)
     for dia, momentos_dict in resumen_menu.items():
-        # Cabecera del día (Azul con texto Blanco como en la compra)
         pdf.set_font("Arial", "B", 11)
         pdf.set_fill_color(27, 69, 180) 
         pdf.set_text_color(255, 255, 255)
         pdf.cell(190, 8, f" {dia}", 1, 1, 'L', True)
         
-        # Contenido del día
         pdf.set_font("Arial", "", 9)
         pdf.set_text_color(0, 0, 0)
         for m, platos in momentos_dict.items():
@@ -84,65 +82,61 @@ def generar_pdf(df_final, total_pax, re_total, resumen_menu, censo_dict):
                 pdf.multi_cell(190, 6, f"{m}: {txt_platos}", border=1)
         pdf.ln(2)
 
-    # --- PÁGINA 2: LISTA DE COMPRA Y DESGLOSE POR RAMAS ---
+    # --- PÁGINA 2: COMPRA ---
     pdf.add_page()
     pdf.set_font("Arial", "B", 16)
     pdf.set_text_color(27, 69, 180)
     pdf.cell(200, 10, "LISTA DE LA COMPRA FINAL", ln=True, align="C")
     pdf.ln(5)
     
-    # Info de personas
     pdf.set_font("Arial", "", 12)
     pdf.set_text_color(0, 0, 0)
     pdf.cell(200, 10, f"Personas Totales: {total_pax}", ln=True)
     pdf.ln(5)
     
-    # Cabecera Tabla Compra
+    # Cabecera: solo 2 columnas para que quepa bien el texto formateado
     pdf.set_fill_color(27, 69, 180) 
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("Arial", "B", 11)
-    pdf.cell(80, 10, " Ingrediente", 1, 0, 'L', True)
-    pdf.cell(50, 10, " Cantidad Total", 1, 0, 'L', True)
-    pdf.cell(50, 10, " Unidad", 1, 1, 'L', True)
+    pdf.cell(100, 10, " Ingrediente", 1, 0, 'L', True)
+    pdf.cell(80, 10, " Cantidad Total", 1, 1, 'L', True)
 
-    # Cuerpo Tabla Compra
     pdf.set_text_color(0, 0, 0)
-    pdf.set_font("Arial", "", 10)
-    
-    # Diccionario de factores (los mismos que usas en el sidebar)
-    factores = {"Cas": 0.70, "Lob": 0.85, "Exp": 1.0, "Pio": 1.25, "Rut": 1.45, "Mon": 1.50}
+    factores = {"Cas": 0.70, "Lob": 0.85, "Exp": 1.0, "Pio": 1.25, "Rut": 1.35, "Mon": 1.40}
     nombres_ramas = {"Cas": "Castores", "Lob": "Lobatos", "Exp": "Exploradores", "Pio": "Pioneros", "Rut": "Rutas", "Mon": "Kraal"}
 
     for _, fila in df_final.iterrows():
-        # Fila principal del ingrediente
         pdf.set_font("Arial", "B", 10)
-        pdf.set_fill_color(255, 255, 255)
-
+        pdf.set_fill_color(240, 240, 240)
+        
         ing = str(fila['Ingrediente']).encode('latin-1', 'replace').decode('latin-1')
-        # CAMBIO AQUÍ: Usamos 'Compra Final' que ya está redondeada y formateada
-        compra_formateada = str(fila['Compra Final']).encode('latin-1', 'replace').decode('latin-1')
+        # USAMOS 'Compra Final' que ya tiene el redondeo y los 2 decimales
+        compra_txt = str(fila['Compra Final']).encode('latin-1', 'replace').decode('latin-1')
         
         pdf.cell(100, 10, f" {ing}", 1, 0, 'L', True)
-        pdf.cell(80, 10, f" {compra_formateada}", 1, 1, 'L', True) # Quitamos columna unidad porque ya va en el texto
+        pdf.cell(80, 10, f" {compra_txt}", 1, 1, 'L', True)
         
-        # --- DESGLOSE POR RAMAS (Pequeño debajo de cada ingrediente) ---
-        desglose_txt = ""
+        # Desglose por ramas
+        pdf.set_font("Arial", "I", 8)
+        pdf.set_text_color(100, 100, 100)
+        
         cant_total_num = fila['Cantidad_Base']
         racion_base = cant_total_num / re_total if re_total > 0 else 0
         uni = str(fila['Unidad']).encode('latin-1', 'replace').decode('latin-1')
-        
+
+        desglose_txt = ""
         for cod, num in censo_dict.items():
             if num > 0:
-                # Cantidad para esta rama = (Ración Base * Factor Rama) * Número de niños
                 cant_rama = (racion_base * factores[cod]) * num
-                # Redondeamos un poco para que no salgan mil decimales
-                desglose_txt += f"{nombres_ramas[cod]}: {round(cant_rama, 2)} {uni} | "
+                # Aquí forzamos 2 decimales en el desglose
+                desglose_txt += f"{nombres_ramas[cod]}: {cant_rama:.2f} {uni} | "
         
         pdf.multi_cell(180, 5, desglose_txt, border='LRB')
         pdf.set_text_color(0, 0, 0)
         pdf.ln(1)
 
     return pdf.output(dest='S').encode('latin-1')
+
 
 df_recetas = cargar_datos(URL_ING)
 df_plantillas = cargar_datos(URL_PLAN)
