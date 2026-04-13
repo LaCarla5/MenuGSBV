@@ -42,9 +42,9 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- CONEXIÓN ---
-SHEET_ID = "1UDTY__cuqBq7SZ6qKcsKJ3CQ_KcKUZALUBm86E_b8-o"
+SHEET_ID = "13jxaA8o2S0ORwAj_O7OtVzfhPKZfQT5IA7HV2K-M-hg"
 URL_ING = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=0"
-GID_PLANTILLAS = "908771195" 
+GID_PLANTILLAS = "1660862399" 
 URL_PLAN = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={GID_PLANTILLAS}"
 
 @st.cache_data(ttl=5)
@@ -156,7 +156,7 @@ with st.sidebar:
     mon = st.number_input("Kraal + Staff", 0, 500, 0)
 
     total_pax = cas + lob + exp + pio + rut + mon
-    re_total = (cas * 0.70) + (lob * 0.85) + (exp * 1.0) + (pio * 1.25) + (rut * 1.35) + (mon * 1.40)
+    re_total = (cas * 0.70) + (lob * 0.85) + (exp * 1.0) + (pio * 1.30) + (rut * 1.40) + (mon * 1.45)
     
     st.metric("Total Personas", f"{total_pax}")
 
