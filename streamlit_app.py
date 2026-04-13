@@ -163,7 +163,7 @@ with st.sidebar:
 st.title("⚜️ Planificador de Intendencia GSBV")
 
 if not df_recetas.empty:
-    c_plat, c_ing, c_gram, c_uni = df_recetas.columns[0], df_recetas.columns[1], df_recetas.columns[2], df_recetas.columns[3]
+    c_plat, c_ing, c_gram, c_uni, c_cat, c_rec = df_recetas.columns[0], df_recetas.columns[1], df_recetas.columns[2], df_recetas.columns[3], df_recetas.columns[4], df_recetas.columns[5]
 
     if not df_plantillas.empty:
         with st.expander("📂 Cargar Menú desde Plantilla"):
@@ -193,7 +193,6 @@ if not df_recetas.empty:
 
     # --- VALIDACIÓN Y CÁLCULO ---
     if st.button("📦 PREPARAR LISTA DE COMPRA"):
-        # Comprobar si hay niños introducidos
         if total_pax <= 0:
             st.error("⚠️ Error: Debes introducir el número de personas en la barra lateral.")
         else:
@@ -212,16 +211,34 @@ if not df_recetas.empty:
                     for plato in seleccionados:
                         ingreds = df_recetas[df_recetas[c_plat] == plato]
                         for _, row in ingreds.iterrows():
-                            try: val = float(str(row[c_gram]).replace(',', '.').strip())
-                            except: val = 0.0
-                            acumulado.append({"Ingrediente": row[c_ing], "Cantidad_Base": val * re_total, "Unidad": row[c_uni]})
-            
-            # Comprobar si hay alimentos seleccionados
+                            try:
+                                # Cantidad por persona definida en el Excel
+                                val = float(str(row[c_gram]).replace(',', '.').strip())
+                                # Kcal por cada 100g/ud (Aquí corregido: c_kc es el índice de calorías)
+                                kc100 = float(str(row[c_rec]).replace(',', '.').strip()) if c_rec else 0.0
+                            except:
+                                val = 0.0
+                                kc100 = 0.0
+
+                            # Determinamos la cantidad final según si es postre o no
+                            if row[c_cat] == "Postre":
+                                cantidad_final = total_pax 
+                            else:
+                                cantidad_final = val * total_pax
+
+                            # Guardamos en la lista acumulada
+                            # IMPORTANTE: El nombre debe ser 'Cantidad_Base' para que el groupby funcione
+                            acumulado.append({
+                                "Ingrediente": row[c_ing], 
+                                "Cantidad_Base": cantidad_final, 
+                                "Unidad": row[c_uni]
+                            })
+
             if platos_seleccionados_total == 0:
                 st.error("⚠️ Error: No has seleccionado ningún plato en el calendario.")
             elif acumulado:
+                # Ahora 'Cantidad_Base' sí existe en el DataFrame
                 df_calculado = pd.DataFrame(acumulado).groupby(['Ingrediente', 'Unidad'])['Cantidad_Base'].sum().reset_index()
-                df_calculado = df_calculado[['Ingrediente', 'Cantidad_Base', 'Unidad']]
                 st.session_state["df_compra"] = df_calculado
                 st.session_state["resumen_menu"] = resumen_menu
                 st.success("✅ Lista generada con éxito. Revisa y ajusta las cantidades abajo.")
