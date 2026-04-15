@@ -38,6 +38,24 @@ st.markdown("""
     div[data-baseweb="select"] {
         border-color: #1b45b4 !important;
     }
+    
+    .stDownloadButton>button {
+        margin-top: 20px;
+        background-color: #1b45b4; 
+        color: white; 
+        border-radius: 10px;
+        transition: 0.3s;
+        font-weight: bold;
+    }
+    .stDownloadButton>button:hover {
+        margin-top: 20px;
+        background-color: #1b45b4; 
+        color: white; 
+        border-radius: 10px;
+        transform: scale(1.02);
+        font-weight: bold; /* Efecto de zoom suave */
+    }
+            
     </style>
     """, unsafe_allow_html=True)
 
@@ -56,42 +74,108 @@ def cargar_datos(url):
     except:
         return pd.DataFrame()
 
-def generar_pdf(df_final, total_pax, re_total, resumen_menu, censo_dict):
-    pdf = FPDF()
+# PDF 1
+def generar_pdf_planificacion(resumen_menu, df_recetas):
+    pdf = FPDF(orientation='L', unit='mm', format='A4')
     pdf.set_auto_page_break(auto=True, margin=15)
     
-    # --- PÁGINA 1: PLANIFICACIÓN ---
-    pdf.add_page()
-    pdf.set_font("Arial", "B", 16)
-    pdf.set_text_color(27, 69, 180) 
-    pdf.cell(w=200, h=10, txt="PLANIFICACION DE MENU - GSBV", border=0, ln=1, align="C")
-    pdf.ln(10)
-    
-    pdf.set_text_color(0, 0, 0)
-    for dia, momentos_dict in resumen_menu.items():
-        pdf.set_font("Arial", "B", 11)
-        pdf.set_fill_color(27, 69, 180) 
-        pdf.set_text_color(255, 255, 255)
-        pdf.cell(190, 8, f" {dia}", 1, 1, 'L', True)
-        
-        pdf.set_font("Arial", "", 9)
-        pdf.set_text_color(0, 0, 0)
-        for m, platos in momentos_dict.items():
-            if platos:
-                txt_platos = ", ".join(platos).encode('latin-1', 'replace').decode('latin-1')
-                pdf.multi_cell(190, 6, f"{m}: {txt_platos}", border=1)
-        pdf.ln(2)
+    # 1. Preparar datos base
+    dias_totales = list(resumen_menu.keys())
+    momentos_lista = ["Desayuno", "Almuerzo", "Comida", "Merienda", "Cena"]
+    platos_unicos = set()
 
-    # --- PÁGINA 2: COMPRA ---
-    pdf.add_page()
+    # --- BUCLE PARA GENERAR TABLAS (Cada 7 días) ---
+    for i in range(0, len(dias_totales), 7):
+        pdf.add_page() 
+        dias_grupo = dias_totales[i : i + 7] 
+        
+        pdf.set_font("Arial", "B", 16)
+        pdf.set_text_color(27, 69, 180) 
+        pdf.cell(w=0, h=10, txt=f"CUADRANTE DE MENÚ - GSBV (Parte {int(i/7) + 1})", border=0, ln=1, align="C")
+        pdf.ln(5)
+
+        ancho_momento = 30
+        ancho_dia = (277 - ancho_momento) / len(dias_grupo)
+
+        # Cabecera
+        pdf.set_font("Arial", "B", 10)
+        pdf.set_fill_color(27, 69, 180)
+        pdf.set_text_color(255, 255, 255)
+        pdf.cell(ancho_momento, 10, "Momento", 1, 0, 'C', True)
+        for dia in dias_grupo:
+            pdf.cell(ancho_dia, 10, dia, 1, 0, 'C', True)
+        pdf.ln()
+
+        # Filas de Momentos
+        pdf.set_text_color(0, 0, 0)
+        for m in momentos_lista:
+            altura_fila = 28 
+            y_inicio_fila = pdf.get_y()
+            
+            pdf.set_font("Arial", "B", 9)
+            pdf.set_fill_color(240, 240, 240)
+            pdf.cell(ancho_momento, altura_fila, m, 1, 0, 'C', True)
+            
+            for dia in dias_grupo:
+                platos = resumen_menu[dia].get(m, [])
+                for p in platos: platos_unicos.add(p)
+                
+                txt_platos = "\n".join(platos)
+                x, y = pdf.get_x(), pdf.get_y()
+                pdf.rect(x, y, ancho_dia, altura_fila)
+                
+                pdf.set_font("Arial", "B", 10)
+                num_lineas = len(platos) if platos else 1
+                altura_texto = num_lineas * 5 
+                offset_v = (altura_fila - altura_texto) / 2
+                
+                pdf.set_xy(x, y_inicio_fila + max(0, offset_v))
+                pdf.multi_cell(ancho_dia, 5, txt_platos.encode('latin-1', 'replace').decode('latin-1'), border=0, align='C')
+                
+                pdf.set_font("Arial", "", 8) 
+                pdf.set_xy(x + ancho_dia, y_inicio_fila)
+
+            # ESTA LÍNEA debe estar alineada con el 'for dia' (fuera de él)
+            pdf.set_y(y_inicio_fila + altura_fila)
+
+    # --- SECCIÓN DE RECETAS (FUERA DEL BUCLE DE 7 DÍAS) ---
+    pdf.add_page(orientation='P')
     pdf.set_font("Arial", "B", 16)
     pdf.set_text_color(27, 69, 180)
-    pdf.cell(200, 10, "LISTA DE LA COMPRA FINAL", ln=True, align="C")
+    pdf.cell(0, 10, "DETALLE DE PREPARACIÓN", ln=True, align="C")
     pdf.ln(5)
+
+    c_plat = df_recetas.columns[0]
+    c_rece = df_recetas.columns[5] 
+
+    for plato_nombre in sorted(platos_unicos):
+        filas_plato = df_recetas[df_recetas[c_plat] == plato_nombre]
+        if not filas_plato.empty:
+            receta_serie = filas_plato[c_rece].dropna()
+            receta_serie = receta_serie[receta_serie.astype(str).str.strip() != ""]
+            
+            if not receta_serie.empty:
+                texto_receta = str(receta_serie.iloc[0])
+                pdf.set_font("Arial", "B", 12)
+                pdf.set_text_color(27, 69, 180)
+                pdf.cell(0, 10, f"RECETA: {plato_nombre.upper()}", ln=True)
+                pdf.set_font("Arial", "", 10)
+                pdf.set_text_color(0, 0, 0)
+                pdf.multi_cell(0, 6, texto_receta.encode('latin-1', 'replace').decode('latin-1'), border="B")
+                pdf.ln(5)
+
+    # EL RETURN debe estar al final de toda la función
+    return pdf.output(dest='S').encode('latin-1')
+
+    # PDF 2
+def generar_pdf_compra(df_final, re_total, censo_dict):
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
     
-    pdf.set_font("Arial", "", 12)
-    pdf.set_text_color(0, 0, 0)
-    pdf.cell(200, 10, f"Personas Totales: {total_pax}", ln=True)
+    pdf.set_font("Arial", "B", 16)
+    pdf.set_text_color(27, 69, 180)
+    pdf.cell(190, 10, "LISTA DE LA COMPRA FINAL", ln=True, align="C")
     pdf.ln(5)
     
     # Cabecera: solo 2 columnas para que quepa bien el texto formateado
@@ -148,7 +232,7 @@ with st.sidebar:
     f_ini = st.date_input("Fecha inicio", datetime.date.today())
     f_fin = st.date_input("Fecha fin", datetime.date.today() + datetime.timedelta(days=3))
     st.divider()
-    cas = st.number_input("Castores", 0, 500, 0)
+    cas = st.number_input("Castores", 0, 500, 3)
     lob = st.number_input("Lobatos", 0, 500, 0)
     exp = st.number_input("Exploradores", 0, 500, 0)
     pio = st.number_input("Pioneros", 0, 500, 0)
@@ -197,37 +281,30 @@ if not df_recetas.empty:
             st.error("⚠️ Error: Debes introducir el número de personas en la barra lateral.")
         else:
             acumulado = []
-            resumen_menu = {}
+            resumen_menu_dict = {}
             platos_seleccionados_total = 0
 
             for i in range(num_dias):
                 fecha_loop = f_ini + datetime.timedelta(days=i)
                 tag_dia = f"{DIAS_SEMANA[fecha_loop.weekday()]} {fecha_loop.strftime('%d/%m')}"
-                resumen_menu[tag_dia] = {}
+                resumen_menu_dict[tag_dia] = {}
                 for m in momentos:
                     seleccionados = st.session_state.get(f"sel_{fecha_loop}_{m}", [])
-                    resumen_menu[tag_dia][m] = seleccionados
+                    resumen_menu_dict[tag_dia][m] = seleccionados
                     platos_seleccionados_total += len(seleccionados)
                     for plato in seleccionados:
                         ingreds = df_recetas[df_recetas[c_plat] == plato]
                         for _, row in ingreds.iterrows():
                             try:
-                                # Cantidad por persona definida en el Excel
                                 val = float(str(row[c_gram]).replace(',', '.').strip())
-                                # Kcal por cada 100g/ud (Aquí corregido: c_kc es el índice de calorías)
-                                kc100 = float(str(row[c_rec]).replace(',', '.').strip()) if c_rec else 0.0
                             except:
                                 val = 0.0
-                                kc100 = 0.0
 
-                            # Determinamos la cantidad final según si es postre o no
                             if row[c_cat] == "Postre":
                                 cantidad_final = total_pax 
                             else:
                                 cantidad_final = val * total_pax
 
-                            # Guardamos en la lista acumulada
-                            # IMPORTANTE: El nombre debe ser 'Cantidad_Base' para que el groupby funcione
                             acumulado.append({
                                 "Ingrediente": row[c_ing], 
                                 "Cantidad_Base": cantidad_final, 
@@ -235,60 +312,79 @@ if not df_recetas.empty:
                             })
 
             if platos_seleccionados_total == 0:
-                st.error("⚠️ Error: No has seleccionado ningún plato en el calendario.")
-            elif acumulado:
-                # Ahora 'Cantidad_Base' sí existe en el DataFrame
-                df_calculado = pd.DataFrame(acumulado).groupby(['Ingrediente', 'Unidad'])['Cantidad_Base'].sum().reset_index()
-                st.session_state["df_compra"] = df_calculado
-                st.session_state["resumen_menu"] = resumen_menu
-                st.success("✅ Lista generada con éxito. Revisa y ajusta las cantidades abajo.")
+                st.error("⚠️ Error: No has seleccionado ningún plato.")
+            else:
+                # Agrupar y guardar en session_state
+                df_res = pd.DataFrame(acumulado).groupby(['Ingrediente', 'Unidad'])['Cantidad_Base'].sum().reset_index()
+                st.session_state["df_compra"] = df_res
+                st.session_state["resumen_menu"] = resumen_menu_dict
+                st.session_state["pax_guardados"] = total_pax
+                st.session_state["re_total_guardado"] = re_total
+                # Guardamos el censo exacto en ese momento
+                st.session_state["censo_guardado"] = {"Cas": cas, "Lob": lob, "Exp": exp, "Pio": pio, "Rut": rut, "Mon": mon}
+                st.rerun()
 
+# --- MOSTRAR RESULTADOS (Fuera del botón para que no desaparezca) ---
     if "df_compra" in st.session_state:
-        st.info("💡 Puedes hacer doble clic en las cantidades para ajustarlas manualmente si lo necesitas.")
+        st.divider()
+        st.subheader("🛒 Revisión de Compra")
+        
+        # El editor debe estar dentro del IF
         df_editado = st.data_editor(
             st.session_state["df_compra"],
             column_config={
-                "Cantidad_Base": st.column_config.NumberColumn("Cantidad (Editar aquí)", format="%.2f"),
+                "Cantidad_Base": st.column_config.NumberColumn("Cantidad (Ajustable)", format="%.2f"),
                 "Ingrediente": st.column_config.Column(disabled=True),
                 "Unidad": st.column_config.Column(disabled=True)
             },
             hide_index=True,
-            use_container_width=True
+            use_container_width=True,
+            key="editor_compra"
         )
 
+        # Esta función debe estar indentada para que exista df_editado
         def fmt(v, u):
-            # Redondeamos SIEMPRE hacia arriba
             v_redondeado = math.ceil(v) 
-            
             u_str = str(u).lower()
-            if 'uds' in u_str: 
-                return f"{v_redondeado} uds"
-            
-            # Si son gramos/ml y pasan de 1000, convertimos a kg/l con 2 decimales
-            if v >= 1000:
-                return f"{v/1000:.2f} kg/l" 
-            
+            if 'uds' in u_str: return f"{v_redondeado} uds"
+            if v >= 1000: return f"{v/1000:.2f} kg/l" 
             return f"{v_redondeado} {u}"
-        
+    
+        # Aplicamos el formato a la nueva columna
         df_editado['Compra Final'] = df_editado.apply(lambda x: fmt(x['Cantidad_Base'], x['Unidad']), axis=1)
 
-       # Creamos el diccionario con los datos del censo (nombres que usaste en el sidebar)
-        censo_para_pdf = {
-            "Cas": cas, 
-            "Lob": lob, 
-            "Exp": exp, 
-            "Pio": pio, 
-            "Rut": rut, 
-            "Mon": mon
-        }
+        # Mostrar botones de descarga
+        st.subheader("⬇️ Descargar Documentación")
+        _, col_btn1, space, col_btn2, _ = st.columns([1.5, 3, 0.5, 3, 1.5])
 
-        # Llamamos a la función pasando los 5 argumentos en orden
-        pdf_data = generar_pdf(
-            df_editado, 
-            total_pax, 
-            re_total, 
-            st.session_state["resumen_menu"], 
-            censo_para_pdf
-        )
-        
-        st.download_button("📥 Descargar Informe Final Ajustado (PDF)", pdf_data, f"compra_GSBV_{datetime.date.today()}.pdf")
+        try:
+            # Generamos los bytes del PDF
+            pdf_plan_bytes = generar_pdf_planificacion(
+                st.session_state["resumen_menu"],
+                df_recetas
+                )
+            
+            pdf_compra_bytes = generar_pdf_compra(
+                df_editado, 
+                st.session_state["re_total_guardado"], 
+                st.session_state["censo_guardado"]
+            )
+
+            with col_btn1:
+                st.download_button(
+                label="📄 DESCARGAR MENÚ",
+                data=pdf_plan_bytes,
+                file_name=f"menu_{datetime.date.today()}.pdf",
+                mime="application/pdf",
+                use_container_width=True # Esto hace que ocupe todo el ancho de su columna
+            )
+            with col_btn2:
+                st.download_button(
+                    label="🛒 LISTA DE COMPRA",
+                    data=pdf_compra_bytes,
+                    file_name=f"compra_{datetime.date.today()}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+            )
+        except Exception as e:
+            st.error(f"Hubo un error generando el PDF: {e}")
