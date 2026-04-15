@@ -232,7 +232,7 @@ with st.sidebar:
     f_ini = st.date_input("Fecha inicio", datetime.date.today())
     f_fin = st.date_input("Fecha fin", datetime.date.today() + datetime.timedelta(days=3))
     st.divider()
-    cas = st.number_input("Castores", 0, 500, 3)
+    cas = st.number_input("Castores", 0, 500, 0)
     lob = st.number_input("Lobatos", 0, 500, 0)
     exp = st.number_input("Exploradores", 0, 500, 0)
     pio = st.number_input("Pioneros", 0, 500, 0)
@@ -315,7 +315,10 @@ if not df_recetas.empty:
                 st.error("⚠️ Error: No has seleccionado ningún plato.")
             else:
                 # Agrupar y guardar en session_state
+                # 1. Agrupamos y sumamos
                 df_res = pd.DataFrame(acumulado).groupby(['Ingrediente', 'Unidad'])['Cantidad_Base'].sum().reset_index()
+                # 2. Reordenamos las columnas (Simplemente pasamos la lista con el orden nuevo)
+                df_res = df_res[['Ingrediente', 'Cantidad_Base', 'Unidad']]
                 st.session_state["df_compra"] = df_res
                 st.session_state["resumen_menu"] = resumen_menu_dict
                 st.session_state["pax_guardados"] = total_pax
